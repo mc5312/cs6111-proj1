@@ -34,6 +34,7 @@ def get_relevance_feedback(res):
 
 
 def expand_query(original_query, res, fbs):
+    print('Indexing results ....')
     original_q = original_query.split()
     new_q = []
 
@@ -51,15 +52,16 @@ def expand_query(original_query, res, fbs):
         if word not in stopwords:
             heapq.heappush(word_queue, (-(prob_r - prob_nr), word))
 
-    new_word_count = 0
+    new_word = []
     while len(new_q) < len(original_q) + 2:
         this_score, this_word = heapq.heappop(word_queue)
         if this_word in original_q:
             new_q.append(this_word)
-        elif new_word_count < 2:
+        elif len(new_word) < 2:
             new_q.append(this_word)
-            new_word_count += 1
+            new_word.append(this_word)
     new_query = ' '.join(new_q)
+    print('Augmenting by  ' + ' '.join(new_word))
     return new_query
 
 
@@ -88,5 +90,6 @@ if __name__ == "__main__":
             break
         else:
             print('Still below the desired precision of ' + str(desired_precision))
+            print('Indexing results ....')
 
         query = expand_query(query, results, feedbacks)

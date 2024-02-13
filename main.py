@@ -32,8 +32,8 @@ def get_ngrams(n = 2):
 def get_best_ngrams(ngrams, curr_query, k = 1, alpha = 0.5):
     '''
     get_best_ngrams returns the best ngrams in present_docs based on (1) the probability of any word in the n-gram appearing in bag_of word
-    and (2) the probability of the an n_gram appearing in the docs 
-    :param curr_query: a tuple consisting of the terms in the current query. We rule out tuples that contain a word already present in the query
+    and (2) the probability of the entire n_gram appearing in the docs 
+    :param curr_query: a tuple consisting of the terms in the current query. We rule out ngrams that contain a word already present in the query
     :param k: the number of best ngrams to return
     :param alpha: A number between 0 and 1 that mediates between (1) and (2) [see above]. A higher value will emphasize (2).
     :return: k best ngrams

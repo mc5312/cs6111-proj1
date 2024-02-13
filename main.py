@@ -13,14 +13,18 @@ zone_weight = {'title': 1.5, 'snippet': 1.0, 'content': 0.2}
 exclude_filetype = ['jpg', 'jpeg', 'png', 'gif', 'tiff', 'psd', 'pdf', 'eps', 'ai', 'indd', 'raw']
 
 
-def get_text_from_html(html):
+def get_text_from_html(link):
     """
     Call BeautifulSoup with lxml parser to get text from html.
     :param html: input html text
     :return: formatted text in string
     """
-    soup = BeautifulSoup(html, 'lxml')
-    return soup.get_text()
+    try:
+        html = requests.get(link).text
+        soup = BeautifulSoup(html, 'lxml')
+        return soup.get_text()
+    except Exception as ex:
+        return ''
 
 
 def parse_text(text):
@@ -129,11 +133,11 @@ def expand_query(original_query, res, fbs):
         if fbs[i]:
             doc['relevant']['title'] += [parse_text(res[i]['title'])]
             doc['relevant']['snippet'] += [parse_text(res[i]['snippet'])]
-            doc['relevant']['content'] += [parse_text(get_text_from_html(requests.get(res[i]['link']).text))]
+            doc['relevant']['content'] += [parse_text(get_text_from_html(res[i]['link']))]
         else:
             doc['non_relevant']['title'] += [parse_text(res[i]['title'])]
             doc['non_relevant']['snippet'] += [parse_text(res[i]['snippet'])]
-            doc['non_relevant']['content'] += [parse_text(get_text_from_html(requests.get(res[i]['link']).text))]
+            doc['non_relevant']['content'] += [parse_text(get_text_from_html(res[i]['link']))]
 
     # Create bag of words for analysis
     bag_of_word = set(original_words)
@@ -151,7 +155,6 @@ def expand_query(original_query, res, fbs):
             for relevance in ['relevant', 'non_relevant']:
                 # for zone in ['title', 'snippet', 'content']:
                 for zone in ['title', 'snippet']:
-
                     # Compute term-frequency per document zone
                     tf = np.mean([text.count(word) / len(text) for text in doc[relevance][zone]])
 

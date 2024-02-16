@@ -9,22 +9,8 @@ from googleapiclient.discovery import build
 
 api_key, engine_id, desired_precision, query = None, None, None, None
 stopwords = open('proj1-stop.txt', 'r').read().replace('\n', ' ').split()
-zone_weight = {'title': 1.5, 'snippet': 1.0, 'content': 0.2}
+zone_weight = {'title': 1.5, 'snippet': 1.0}
 exclude_filetype = ['jpg', 'jpeg', 'png', 'gif', 'tiff', 'psd', 'pdf', 'eps', 'ai', 'indd', 'raw']
-
-
-def get_text_from_html(link):
-    """
-    Call BeautifulSoup with lxml parser to get text from html.
-    :param html: input html text
-    :return: formatted text in string
-    """
-    try:
-        html = requests.get(link).text
-        soup = BeautifulSoup(html, 'lxml')
-        return soup.get_text()
-    except Exception as ex:
-        return ''
 
 
 def parse_text(text):
@@ -88,7 +74,7 @@ def get_relevance_feedback(res):
 def expand_query(original_query, res, fbs):
     """
     === Word Selection ===
-    Search results are considered as document with different zones: Title, Snippet and Content
+    Search results are considered as document with different zones: Title and Snippet
     Each document is classified as "relevant" or "non-relevant" based on user feedbacks.
 
     For each word in each zone, 2 zone sub-scores are computed for relevant and non-relevant documents respectively.
@@ -118,14 +104,14 @@ def expand_query(original_query, res, fbs):
     # === The following codes are for Word Selection ===
     # Initialize "doc" for storing list of words in each zone, for relevant and non-relevant docs
     doc = {
-        'relevant': {'title': [], 'snippet': [], 'content': []},
-        'non_relevant': {'title': [], 'snippet': [], 'content': []}
+        'relevant': {'title': [], 'snippet': []},
+        'non_relevant': {'title': [], 'snippet': []}
     }
 
     # Initialize score of a word in each zone, for relevant and non-relevant docs
     score = {
-        'relevant': {'title': 0, 'snippet': 0, 'content': 0},
-        'non_relevant': {'title': 0, 'snippet': 0, 'content': 0}
+        'relevant': {'title': 0, 'snippet': 0},
+        'non_relevant': {'title': 0, 'snippet': 0}
     }
 
     # Classify search results into doc, based on user feedbacks
@@ -133,16 +119,13 @@ def expand_query(original_query, res, fbs):
         if fbs[i]:
             doc['relevant']['title'] += [parse_text(res[i]['title'])]
             doc['relevant']['snippet'] += [parse_text(res[i]['snippet'])]
-            doc['relevant']['content'] += [parse_text(get_text_from_html(res[i]['link']))]
         else:
             doc['non_relevant']['title'] += [parse_text(res[i]['title'])]
             doc['non_relevant']['snippet'] += [parse_text(res[i]['snippet'])]
-            doc['non_relevant']['content'] += [parse_text(get_text_from_html(res[i]['link']))]
 
     # Create bag of words for analysis
     bag_of_word = set(original_words)
     for zone in doc['relevant']:
-        # if zone in ['title', 'snippet', 'content']:
         if zone in ['title', 'snippet']:
             bag_of_word.update([
                 word for word in list(itertools.chain.from_iterable(doc['relevant'][zone]))
@@ -153,7 +136,6 @@ def expand_query(original_query, res, fbs):
     for word in bag_of_word:
         if word not in stopwords:
             for relevance in ['relevant', 'non_relevant']:
-                # for zone in ['title', 'snippet', 'content']:
                 for zone in ['title', 'snippet']:
                     # Compute term-frequency per document zone
                     tf = np.mean([text.count(word) / len(text) for text in doc[relevance][zone]])
@@ -167,7 +149,7 @@ def expand_query(original_query, res, fbs):
             # Total score of a word is computed as the sum of weighted zone scores.
             # Zone scores is computed as the score difference between relevant documents and non_relevant documents
             total_score = 0
-            for zone in ['title', 'snippet', 'content']:
+            for zone in ['title', 'snippet']:
                 total_score += (score['relevant'][zone] - score['non_relevant'][zone]) * zone_weight[zone]
             heapq.heappush(word_queue, (-total_score, word))
 
@@ -183,7 +165,7 @@ def expand_query(original_query, res, fbs):
     # === The following codes are for Word Ordering ===
     word_rank_list = []  # list for storing word rank in each relevant doc
     for i in range(num_relevant_result):
-        full_doc = doc['relevant']['title'][i] + doc['relevant']['snippet'][i] + doc['relevant']['content'][i]
+        full_doc = doc['relevant']['title'][i] + doc['relevant']['snippet'][i]
 
         word_avg_pos = []
         for word in original_words + new_words:

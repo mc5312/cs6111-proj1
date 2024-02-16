@@ -11,6 +11,35 @@ api_key, engine_id, desired_precision, query = None, None, None, None
 stopwords = open('proj1-stop.txt', 'r').read().replace('\n', ' ').split()
 zone_weight = {'title': 1.5, 'snippet': 1.0}
 exclude_filetype = ['jpg', 'jpeg', 'png', 'gif', 'tiff', 'psd', 'pdf', 'eps', 'ai', 'indd', 'raw']
+bigram_count = {}   # a dictionary storing number of occurrences of each bi-gram
+
+
+def get_bigram_score(word, alpha=1):
+    """
+    Compute bigram score of a word based on cumulative bigram counts.
+    :param word: word to be searched in the list of previous bi-grams
+    :param alpha: param to control how much a bi-gram occurrence contributes to the score; range is [0.1, 2]
+    :return:
+    """
+
+    # Use logarithm to scale number of bi-gram occurrences, with floor set to 1
+    base_score = np.log10(sum([value for key, value in bigram_count.items() if word in key]) + 1) + 1
+    return base_score ** (max(0.1, min(2, alpha)))
+
+
+def update_bigram_count(text):
+    """
+    Take in a list of words and update bigram_counts, which count number of occurrences of each bi-gram cumulatively
+    :param text: list of words for finding bi-grams
+    :return: array with the stopword-free bi-grams
+    """
+    global bigram_count
+
+    bigrams = [text[index: index + 2] for index, word in enumerate(text) if index <= len(text) - 2]
+    bigrams = list(map(lambda y: tuple(y), filter(lambda x: set(x).isdisjoint(stopwords), bigrams)))
+
+    for bigram in bigrams:
+        bigram_count[bigram] = (bigram_count[bigram] + 1) if (bigram in bigram_count) else 1
 
 
 def parse_text(text):
@@ -77,11 +106,16 @@ def expand_query(original_query, res, fbs):
     Search results are considered as document with different zones: Title and Snippet
     Each document is classified as "relevant" or "non-relevant" based on user feedbacks.
 
-    For each word in each zone, 2 zone sub-scores are computed for relevant and non-relevant documents respectively.
-    Total score for a word is computed by summing the weighted difference of zone scores.
 
-    Score can be based on: Term-Frequency or Probability
-    2 new words with the highest total score are added to the new query
+    For each word in each zone, 2 zone-sub-scores are computed for relevant and non-relevant documents respectively.
+    Total zone-score for a word is computed by summing the weighted difference of zone-scores.
+    Zone-score can be based on: Term-Frequency or Probability
+
+    Bi-gram score is computed for each word by calling get_bigram_score().
+    It is a function of number of occurrences of bi-grams involving that word.
+
+    Final score is computed as a product of Total zone score and Bi-gram score.
+    2 new words with the highest final score are added to the new query
 
     === Word Ordering ===
     Only relevant documents are used to decide word order in new query.
@@ -109,7 +143,7 @@ def expand_query(original_query, res, fbs):
     }
 
     # Initialize score of a word in each zone, for relevant and non-relevant docs
-    score = {
+    zone_score = {
         'relevant': {'title': 0, 'snippet': 0},
         'non_relevant': {'title': 0, 'snippet': 0}
     }
@@ -119,6 +153,10 @@ def expand_query(original_query, res, fbs):
         if fbs[i]:
             doc['relevant']['title'] += [parse_text(res[i]['title'])]
             doc['relevant']['snippet'] += [parse_text(res[i]['snippet'])]
+
+            # Update bigrams count based on relevant documents
+            update_bigram_count(doc['relevant']['title'][-1])
+            update_bigram_count(doc['relevant']['snippet'][-1])
         else:
             doc['non_relevant']['title'] += [parse_text(res[i]['title'])]
             doc['non_relevant']['snippet'] += [parse_text(res[i]['snippet'])]
@@ -126,11 +164,10 @@ def expand_query(original_query, res, fbs):
     # Create bag of words for analysis
     bag_of_word = set(original_words)
     for zone in doc['relevant']:
-        if zone in ['title', 'snippet']:
-            bag_of_word.update([
-                word for word in list(itertools.chain.from_iterable(doc['relevant'][zone]))
-                if (word.isalnum() and (not word.isnumeric()))
-            ])
+        bag_of_word.update([
+            word for word in list(itertools.chain.from_iterable(doc['relevant'][zone]))
+            if (word.isalnum() and (not word.isnumeric()))
+        ])
 
     word_queue = []
     for word in bag_of_word:
@@ -144,22 +181,23 @@ def expand_query(original_query, res, fbs):
                     prob = np.mean([(1 if word in text else 0) for text in doc[relevance][zone]])
 
                     # Choose tf or prob as score for a word
-                    score[relevance][zone] = prob
+                    zone_score[relevance][zone] = prob
 
-            # Total score of a word is computed as the sum of weighted zone scores.
+            # Final score of a word is computed as the sum of weighted zone scores, adjusted by bigram score
             # Zone scores is computed as the score difference between relevant documents and non_relevant documents
-            total_score = 0
-            for zone in ['title', 'snippet']:
-                total_score += (score['relevant'][zone] - score['non_relevant'][zone]) * zone_weight[zone]
-            heapq.heappush(word_queue, (-total_score, word))
+            total_zone_score = sum([
+                (zone_score['relevant'][zone] - zone_score['non_relevant'][zone]) * zone_weight[zone]
+                for zone in ['title', 'snippet']
+            ])
+            bigram_score = get_bigram_score(word)
+            final_score = total_zone_score * bigram_score
+            heapq.heappush(word_queue, (-final_score, word))
 
     new_words = []
     while len(new_words) < 2:
         this_score, this_word = heapq.heappop(word_queue)
         if this_word not in original_words:
             new_words.append(this_word)
-
-    new_query = ' '.join(original_words + new_words)
     print('Augmenting by  ' + ' '.join(new_words))
 
     # === The following codes are for Word Ordering ===

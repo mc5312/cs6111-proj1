@@ -14,7 +14,7 @@ exclude_filetype = ['jpg', 'jpeg', 'png', 'gif', 'tiff', 'psd', 'pdf', 'eps', 'a
 bigram_count = {}   # a dictionary storing number of occurrences of each bi-gram
 
 
-def get_bigram_score(word, alpha=1):
+def get_bigram_score(word, alpha=0.8):
     """
     Compute bigram score of a word based on cumulative bigram counts.
     :param word: word to be searched in the list of previous bi-grams
@@ -27,17 +27,27 @@ def get_bigram_score(word, alpha=1):
     return base_score ** (max(0.1, min(2, alpha)))
 
 
+def get_bigram_list(text, use_stopwords=True):
+    """
+    Takes in a list of words and generate a list of bi-grams
+    :param text: list of words for finding bi-grams
+    :return: array with the stopword-free bi-grams
+    """
+    bigrams = [text[index: index + 2] for index, word in enumerate(text) if index <= len(text) - 2]
+    bigrams = list(map(
+        lambda y: tuple(y), filter(lambda x: set(x).isdisjoint(stopwords), bigrams) if use_stopwords else bigrams
+    ))
+    return bigrams
+
+
 def update_bigram_count(text):
     """
     Take in a list of words and update bigram_counts, which count number of occurrences of each bi-gram cumulatively
     :param text: list of words for finding bi-grams
-    :return: array with the stopword-free bi-grams
     """
     global bigram_count
 
-    bigrams = [text[index: index + 2] for index, word in enumerate(text) if index <= len(text) - 2]
-    bigrams = list(map(lambda y: tuple(y), filter(lambda x: set(x).isdisjoint(stopwords), bigrams)))
-
+    bigrams = get_bigram_list(text)
     for bigram in bigrams:
         bigram_count[bigram] = (bigram_count[bigram] + 1) if (bigram in bigram_count) else 1
 
@@ -199,22 +209,27 @@ def expand_query(original_query, res, fbs):
         if this_word not in original_words:
             new_words.append(this_word)
     print('Augmenting by  ' + ' '.join(new_words))
+    new_word_set = original_words + new_words
 
     # === The following codes are for Word Ordering ===
     word_rank_list = []  # list for storing word rank in each relevant doc
+    corpus = []
     for i in range(num_relevant_result):
-        full_doc = doc['relevant']['title'][i] + doc['relevant']['snippet'][i]
+        full_doc = ['<s>'] + doc['relevant']['title'][i] + ['</s>', '<s>'] + doc['relevant']['snippet'][i] + ['</s>']
+        corpus += [word for word in full_doc if word in (
+                [new_word.lower() for new_word in new_word_set] + ['<s>', '</s>']
+        )]
 
         word_avg_pos = []
-        for word in original_words + new_words:
+        for word in new_word_set:
             if word.lower() in full_doc:
-                # # --- Average Position
+                # # --- 1. Average Position
                 # heapq.heappush(
                 #     word_avg_pos,
                 #     (np.mean([i for i, term in enumerate(full_doc) if term == word.lower()]), word)
                 # )
 
-                # --- First Position
+                # --- 2. First Position
                 heapq.heappush(
                     word_avg_pos,
                     (full_doc.index(word.lower()), word)
@@ -227,16 +242,31 @@ def expand_query(original_query, res, fbs):
         word_avg_pos = [heapq.heappop(word_avg_pos)[1] for i in range(len(word_avg_pos))]
         word_rank_list.append(word_avg_pos)
 
-    # --- Order keywords based on average rank of each keyword
-    word_rank = {word: 0 for word in original_words + new_words}  # dict for storing rank of words in each relevant doc
-    for item in word_rank_list:
-        for rank, word in enumerate(item):
-            word_rank[word] += rank
-    new_query = ' '.join([word_tuple[0] for word_tuple in sorted(word_rank.items(), key=lambda wt: wt[1])])
+    # # --- 1. Order keywords based on average rank of each keyword
+    # word_rank = {word: 0 for word in new_word_set}  # dict for storing rank of words in each relevant doc
+    # for item in word_rank_list:
+    #     for rank, word in enumerate(item):
+    #         word_rank[word] += rank
+    # new_query = ' '.join([word_tuple[0] for word_tuple in sorted(word_rank.items(), key=lambda wt: wt[1])])
 
-    # # --- Order keywords based on most frequent rank in relevant documents
+    # # --- 2. Order keywords based on most frequent rank in relevant documents
     # word_rank_list = [' '.join(item) for item in word_rank_list]
     # new_query = max(set(word_rank_list), key=word_rank_list.count)
+
+    # --- 3. Order keywords based on probability from bigrams in corpus
+    word_order_bigrams = (get_bigram_list(corpus, use_stopwords=False))
+    word_orders = list(itertools.permutations(new_word_set))
+    word_order_score = {}
+    for word_order in word_orders:
+        this_word_order_score = 0
+        this_word_order = ['<s>'] + list(word_order) + ['</s>']
+        for i in range(len(word_order) - 1):
+            this_word_order_score += (word_order_bigrams.count(
+                (this_word_order[i].lower(), this_word_order[i + 1].lower()
+                 )) / len(list(filter(lambda x: x[0] == this_word_order[i].lower(), word_order_bigrams))))
+        word_order_score[word_order] = this_word_order_score
+    top_word_order = list(sorted(word_order_score.items(), key=lambda wt: wt[1], reverse=True)[0][0])
+    new_query = ' '.join(top_word_order)
 
     return new_query
 

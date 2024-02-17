@@ -27,15 +27,16 @@ def get_bigram_score(word, alpha=0.8):
     return base_score ** (max(0.1, min(2, alpha)))
 
 
-def get_bigram_list(text, use_stopwords=True):
+def get_bigram_list(text, allow_stopwords=False):
     """
     Takes in a list of words and generate a list of bi-grams
     :param text: list of words for finding bi-grams
+    :param allow_stopwords: if True, stopwords are allowed in bi-grams
     :return: array with the stopword-free bi-grams
     """
     bigrams = [text[index: index + 2] for index, word in enumerate(text) if index <= len(text) - 2]
     bigrams = list(map(
-        lambda y: tuple(y), filter(lambda x: set(x).isdisjoint(stopwords), bigrams) if use_stopwords else bigrams
+        lambda y: tuple(y), bigrams if allow_stopwords else filter(lambda x: set(x).isdisjoint(stopwords), bigrams)
     ))
     return bigrams
 
@@ -47,10 +48,18 @@ def update_bigram_count(text):
     """
     global bigram_count
 
-    bigrams = get_bigram_list(text)
+    bigrams = get_bigram_list(text, allow_stopwords=True)
     for bigram in bigrams:
         bigram_count[bigram] = (bigram_count[bigram] + 1) if (bigram in bigram_count) else 1
 
+
+def add_begin_end_symbol(text):
+    """
+    Add begin symbol and end symbol to the word list
+    :param text: a list of words
+    :return: List of begin symbol, words and end symbol
+    """
+    return ['<s>'] + text + ['</s>']
 
 def parse_text(text):
     """
@@ -165,8 +174,8 @@ def expand_query(original_query, res, fbs):
             doc['relevant']['snippet'] += [parse_text(res[i]['snippet'])]
 
             # Update bigrams count based on relevant documents
-            update_bigram_count(doc['relevant']['title'][-1])
-            update_bigram_count(doc['relevant']['snippet'][-1])
+            update_bigram_count(add_begin_end_symbol(doc['relevant']['title'][-1]))
+            update_bigram_count(add_begin_end_symbol(doc['relevant']['snippet'][-1]))
         else:
             doc['non_relevant']['title'] += [parse_text(res[i]['title'])]
             doc['non_relevant']['snippet'] += [parse_text(res[i]['snippet'])]
@@ -201,6 +210,7 @@ def expand_query(original_query, res, fbs):
             ])
             bigram_score = get_bigram_score(word)
             final_score = total_zone_score * bigram_score
+
             heapq.heappush(word_queue, (-final_score, word))
 
     new_words = []
@@ -215,9 +225,10 @@ def expand_query(original_query, res, fbs):
     word_rank_list = []  # list for storing word rank in each relevant doc
     corpus = []
     for i in range(num_relevant_result):
-        full_doc = ['<s>'] + doc['relevant']['title'][i] + ['</s>', '<s>'] + doc['relevant']['snippet'][i] + ['</s>']
+        full_doc = add_begin_end_symbol(doc['relevant']['title'][i]) + \
+                   add_begin_end_symbol(doc['relevant']['snippet'][i])
         corpus += [word for word in full_doc if word in (
-                [new_word.lower() for new_word in new_word_set] + ['<s>', '</s>']
+                add_begin_end_symbol([new_word.lower() for new_word in new_word_set])
         )]
 
         word_avg_pos = []
@@ -254,18 +265,20 @@ def expand_query(original_query, res, fbs):
     # new_query = max(set(word_rank_list), key=word_rank_list.count)
 
     # --- 3. Order keywords based on probability from bigrams in corpus
-    word_order_bigrams = (get_bigram_list(corpus, use_stopwords=False))
+    word_order_bigrams = (get_bigram_list(corpus, allow_stopwords=True))
     word_orders = list(itertools.permutations(new_word_set))
-    word_order_score = {}
+    word_order_log_score = {}
     for word_order in word_orders:
-        this_word_order_score = 0
-        this_word_order = ['<s>'] + list(word_order) + ['</s>']
-        for i in range(len(word_order) - 1):
-            this_word_order_score += (word_order_bigrams.count(
-                (this_word_order[i].lower(), this_word_order[i + 1].lower()
-                 )) / len(list(filter(lambda x: x[0] == this_word_order[i].lower(), word_order_bigrams))))
-        word_order_score[word_order] = this_word_order_score
-    top_word_order = list(sorted(word_order_score.items(), key=lambda wt: wt[1], reverse=True)[0][0])
+        this_word_order_log_score = 0
+        this_word_order = ['<s>'] + [word.lower() for word in list(word_order)] + ['</s>']
+        for i in range(len(this_word_order) - 1):
+            num_bigram_first_word = len(list(filter(lambda x: x[0] == this_word_order[i], word_order_bigrams)))
+            if num_bigram_first_word > 0:
+                num_bigram = word_order_bigrams.count((this_word_order[i], this_word_order[i + 1]))
+                with np.errstate(divide='ignore'):
+                    this_word_order_log_score += np.log(num_bigram / num_bigram_first_word)
+        word_order_log_score[word_order] = this_word_order_log_score
+    top_word_order = list(sorted(word_order_log_score.items(), key=lambda wt: wt[1], reverse=True)[0][0])
     new_query = ' '.join(top_word_order)
 
     return new_query

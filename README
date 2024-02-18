@@ -59,7 +59,9 @@ expand_query() is called, the current query is (1) expanded with two new words a
 Both of these modifcations are based on the most recent feedback returned by
 get_relevance_feedback() as well a historical feedback.
 
-We disuss (1) here: To decide which two words to select to add to the current query, a final score
+We disuss (1) here: 
+
+To decide which two words to select to add to the current query, a final score
 is given to every word in the most recent batch of relevant documents. Note that we only consider
 words from the most recent batch of relevant documents, as we make the assumption that the most
 recently selected documents are "more" relevant than earlier relevant documents. This assumption is

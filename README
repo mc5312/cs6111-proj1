@@ -32,7 +32,7 @@ the specifics of our query modifcation method for the following section.
 
 After parsing the command line arguments, main.py operates in a basic loop of running the current
 query (run_query()), getting feedback on that query (get_relevance_feedback())), and modifying the
-query (expand_query) to be used in the iteration. The main WHILE loop in "__main__" will only
+query (expand_query) to be used in the next iteration. The main WHILE loop in "__main__" will only
 terminate when the desired precision is reached. 
 
 run_query() abstracts querying the Google API and returns the filtered results for a desired query. 
@@ -59,14 +59,13 @@ expand_query() is called, the current query is (1) expanded with two new words a
 Both of these modifcations are based on the most recent feedback returned by
 get_relevance_feedback() as well a historical feedback.
 
-We disuss (1) here:
-To decide which two words to select to add to the current query, a final score is given to every
-word in the most recent batch of relevant documents. Note that we only consider words
-from the most recent batch of relevant documents, as we make the assumption that the most recently selected documents
-are "more" relevant than earlier relevant documents. This assumption is reasonble considering that
-users' view of relevant documents have been shown to be dynamically influcenced by the query results that
-they are presented. The final score for each word is composed of two sub-scores: total zone score
-and bigram score. 
+We disuss (1) here: To decide which two words to select to add to the current query, a final score
+is given to every word in the most recent batch of relevant documents. Note that we only consider
+words from the most recent batch of relevant documents, as we make the assumption that the most
+recently selected documents are "more" relevant than earlier relevant documents. This assumption is
+reasonble considering that users' view of relevant documents have been shown to be dynamically
+influcenced by the query results that they are presented. The final score for each word is composed
+of two sub-scores: total zone score and bigram score. 
 
 The total zone score involves two weighted, seperate scores for a word within the 'title'
 and 'snippet' zones across the new batch of documents. We calculate these zone scores for both the
@@ -76,11 +75,10 @@ words that have high scores in non-relevant documents. Only considering the scor
 documents may lead to a query expansion that includes words from irrelevant documents, which may
 lead to poor results. 
 
-As for actually computing the zone scores, we explored calculating the scores 
-using either term-frequency or using the probability of whether
-a word appeared in the zone across the documents, i.e. the probability that the word appears at
-least once in the zone for each document. We found the probabilitstic approach to be more effective in
-our testing.
+As for actually computing the zone scores, we explored calculating the scores using either
+term-frequency or using the probability of whether a word appeared in the zone across the documents,
+i.e. the probability that the word appears at least once in the zone for each document. We found the
+probabilitstic approach to be more effective in our testing.
 
 To calculate the bigram score, we check to see if a given word is present in any of the bigrams of
 of all relevant documents in the history of the program, weighted by the frequency of that
@@ -100,7 +98,7 @@ Galaxy, then a query of the form 'Milky Way Galaxy' is more semantically
 meaningful than 'Way Galaxy Milky'. 
 
 To reorder queries, we use bigrams, attempting to find the
-query order with the highest 'probability'. For every permuatation of word order in
+query order with the highest 'probability'. For every permuatation of word order 
 for the current query, we slide a bigram window [w1, w2 ] over the permutation and calculate the number of times
 the the bigram [w1, w2] appears in the corpus, divided by the number of bigrams that begin with
 [w1]. As discussed in the resource https://web.stanford.edu/~jurafsky/slp3/3.pdf, which was shared

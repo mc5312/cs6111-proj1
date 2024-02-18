@@ -1,0 +1,112 @@
+NAME: Bevis Cheung (mc5312), Sebastian Hereu (smh2278)
+
+------
+Files| 
+------
+(1) main.py - contains all of the logic of our information retrieval system 
+(2) proj1-stop.txt - contains a list of stop words, used in main.py
+
+-------------------
+How to Run Program|
+-------------------
+
+python3 main.py AIzaSyC8EbccVhwPEcQ-oFeFgRTZ1DgfVAOg6-8 9604022c4b8b04d7e <precision> <query>
+
+For example, to execute the query, 'Lebron James' w/ accuracy 0.9, run:
+
+python3 main.py AIzaSyC8EbccVhwPEcQ-oFeFgRTZ1DgfVAOg6-8 9604022c4b8b04d7e 0.9 'Lebron James'
+
+***Note that we have pre-included our <google api key> and <google engine id> for convenience*** 
+
+-------------------
+External Libraries|
+-------------------
+(1) TODO
+
+-------------------
+General Description|
+-------------------
+
+We will first delve into the general structure of main.py. Note that we will save a discussion on 
+the specifics of our query modifcation method for the following section.
+
+After parsing the command line arguments, main.py operates in a basic loop of running the current
+query (run_query()), getting feedback on that query (get_relevance_feedback())), and modifying the
+query (expand_query) to be used in the next iteration. The main WHILE loop in "__main__" will only
+terminate when the desired precision is reached. 
+
+run_query() abstracts querying the Google API and returns the filtered results for a desired query. 
+The function filters out excluded file types including  jpg, jpeg, png, gif, tiff, psd, pdf, eps, ai, indd, and raw. 
+ 
+get_relevance_feeback() serves the results returned by run_query() to the user and seperates
+relevant documents from irrelevant documents based on user feedback. We present the url, title, and
+snippet for each document, and the user simply types 'Y' if the document appears relevant to them
+and 'N' otherwise.  After all ten results have been presented, if the desired precision is reached,
+i.e. the proportion of relevant documents in the results is g.t.e. <precision>, then the
+program terminates. 
+
+If the desired precision has not been reached, the set of relevant and irrelevant documents from the
+current query are fed to expand_query(), which contains the logic for query modification and certain
+bookkeeping tasks needed across queries.  expand_query() returns the new, expanded query that will
+be fed to run_query() in the next iteration of the loop.
+
+------------------------
+Query Modifcation Method|
+------------------------
+
+All of the logic for our query modification method is contained in expand_query(). Each time
+expand_query() is called, the current query is (1) expanded with two new words and (2) reordered.
+Both of these modifcations are based on the most recent feedback returned by
+get_relevance_feedback() as well a historical feedback.
+
+We disuss (1) here: 
+
+To decide which two words to select to add to the current query, a final score
+is given to every word in the most recent batch of relevant documents. Note that we only consider
+words from the most recent batch of relevant documents, as we make the assumption that the most
+recently selected documents are "more" relevant than earlier relevant documents. This assumption is
+reasonble considering that users' view of relevant documents have been shown to be dynamically
+influcenced by the query results that they are presented. The final score for each word is composed
+of two sub-scores: total zone score and bigram score. 
+
+The total zone score involves two weighted, seperate scores for a word within the 'title'
+and 'snippet' zones across the new batch of documents. We calculate these zone scores for both the
+relvant and non-relevant documents and subtract the latter from the former to obtain the finalized
+total zone score for a word. This approach has yielded satisfying results, as we can exclude those
+words that have high scores in non-relevant documents. Only considering the scores for relevant
+documents may lead to a query expansion that includes words from irrelevant documents, which may
+lead to poor results. 
+
+As for actually computing the zone scores, we explored calculating the scores using either
+term-frequency or using the probability of whether a word appeared in the zone across the documents,
+i.e. the probability that the word appears at least once in the zone for each document. We found the
+probabilitstic approach to be more effective in our testing.
+
+To calculate the bigram score, we check to see if a given word is present in any of the bigrams of
+of all relevant documents in the history of the program, weighted by the frequency of that
+bigram. The bigram score component of final score boosts words that appear often in the history
+of relevant documents and emphasizes words that are likely to appear in bigrams. The latter will be
+useful in query reordering step, which we will disuss below. 
+
+
+After combining the bigram and zone scores together to create a final score for each word, we take
+the words with the top two scores and add them to the growing query. 
+
+We discuss (2) here:
+
+For precise search results, not only should the query have the appropriate words, but it should also
+contain those words in the correct order. For example, if a user is interested in the Milky Way
+Galaxy, then a query of the form 'Milky Way Galaxy' is more semantically
+meaningful than 'Way Galaxy Milky'. 
+
+To reorder queries, we use bigrams, attempting to find the
+query order with the highest 'probability'. For every permuatation of word order 
+for the current query, we slide a bigram window [w1, w2 ] over the permutation and calculate the number of times
+the the bigram [w1, w2] appears in the corpus, divided by the number of bigrams that begin with
+[w1]. As discussed in the resource https://web.stanford.edu/~jurafsky/slp3/3.pdf, which was shared
+by Prof. Gravano, this calculation approximates P(w_n| w_1). As we slide the window over the current
+permutation, we add together the scores to calculate afinal word order score for the current
+permutation. This method has proven fruitful, often yeilding semantically meaningful word orders for the
+queries. Going back the example of the Milky Way query, the bigrams (milky, way) and (way, galaxy)
+are likely present several times in our corpus, so the word ordering, 'milky way galaxy' has a high
+likelihood of being chosen as the next word order. 

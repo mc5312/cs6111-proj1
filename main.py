@@ -308,7 +308,7 @@ if __name__ == "__main__":
         if precision >= desired_precision:
             print('Desired precision reached, done')
             break
-        elif: precision == 0:
+        elif precision == 0:
             print('Precision = 0, stop')
             break
         else:

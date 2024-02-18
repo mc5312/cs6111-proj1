@@ -9,7 +9,7 @@ from googleapiclient.discovery import build
 
 api_key, engine_id, desired_precision, query = None, None, None, None
 stopwords = open('proj1-stop.txt', 'r').read().replace('\n', ' ').split()
-zone_weight = {'title': 1.5, 'snippet': 1.0}
+zone_weight = {'title': 1.2, 'snippet': 1.0}
 exclude_filetype = ['jpg', 'jpeg', 'png', 'gif', 'tiff', 'psd', 'pdf', 'eps', 'ai', 'indd', 'raw']
 bigram_count = {}   # a dictionary storing number of occurrences of each bi-gram
 
@@ -60,6 +60,7 @@ def add_begin_end_symbol(text):
     :return: List of begin symbol, words and end symbol
     """
     return ['<s>'] + text + ['</s>']
+
 
 def parse_text(text):
     """
@@ -193,10 +194,10 @@ def expand_query(original_query, res, fbs):
         if word not in stopwords:
             for relevance in ['relevant', 'non_relevant']:
                 for zone in ['title', 'snippet']:
-                    # Compute term-frequency per document zone
+                    # 1. Compute average term-frequency per document zone
                     tf = np.mean([text.count(word) / len(text) for text in doc[relevance][zone]])
 
-                    # Compute probability per document zone
+                    # 2. Compute probability per document zone
                     prob = np.mean([(1 if word in text else 0) for text in doc[relevance][zone]])
 
                     # Choose tf or prob as score for a word
@@ -204,12 +205,12 @@ def expand_query(original_query, res, fbs):
 
             # Final score of a word is computed as the sum of weighted zone scores, adjusted by bigram score
             # Zone scores is computed as the score difference between relevant documents and non_relevant documents
+            bigram_score = get_bigram_score(word)
             total_zone_score = sum([
-                (zone_score['relevant'][zone] - zone_score['non_relevant'][zone]) * zone_weight[zone]
+                (zone_score['relevant'][zone] * bigram_score - zone_score['non_relevant'][zone]) * zone_weight[zone]
                 for zone in ['title', 'snippet']
             ])
-            bigram_score = get_bigram_score(word)
-            final_score = total_zone_score * bigram_score
+            final_score = total_zone_score
 
             heapq.heappush(word_queue, (-final_score, word))
 
@@ -278,6 +279,7 @@ def expand_query(original_query, res, fbs):
                 with np.errstate(divide='ignore'):
                     this_word_order_log_score += np.log(num_bigram / num_bigram_first_word)
         word_order_log_score[word_order] = this_word_order_log_score
+
     top_word_order = list(sorted(word_order_log_score.items(), key=lambda wt: wt[1], reverse=True)[0][0])
     new_query = ' '.join(top_word_order)
 

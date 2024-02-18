@@ -1,10 +1,8 @@
 import sys
 import heapq
-import requests
 import numpy as np
 import re
 import itertools
-from bs4 import BeautifulSoup
 from googleapiclient.discovery import build
 
 api_key, engine_id, desired_precision, query = None, None, None, None

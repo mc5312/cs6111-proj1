@@ -308,11 +308,11 @@ if __name__ == "__main__":
         if precision >= desired_precision:
             print('Desired precision reached, done')
             break
-        elif precision == 0:
-            print('Precision = 0, stop')
-            break
         else:
             print('Still below the desired precision of ' + str(desired_precision))
             print('Indexing results ....')
 
+        if precision == 0:
+            print('Below desired precision, but can no longer augment the query')
+            break
         query = expand_query(query, results, feedbacks)

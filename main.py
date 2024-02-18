@@ -192,9 +192,10 @@ def expand_query(original_query, res, fbs):
         if word not in stopwords:
             for relevance in ['relevant', 'non_relevant']:
                 for zone in ['title', 'snippet']:
-                    # 1. Compute average term-frequency per document zone
-                    tf = np.mean([text.count(word) / len(text) for text in doc[relevance][zone]])
+                    # # 1. Compute average term-frequency per document zone
+                    # tf = np.mean([text.count(word) / len(text) for text in doc[relevance][zone]])
 
+                    # *** Metric 2 (probability) is used in submission ***
                     # 2. Compute probability per document zone
                     prob = np.mean([(1 if word in text else 0) for text in doc[relevance][zone]])
 
@@ -230,39 +231,40 @@ def expand_query(original_query, res, fbs):
                 add_begin_end_symbol([new_word.lower() for new_word in new_word_set])
         )]
 
-        word_avg_pos = []
-        for word in new_word_set:
-            if word.lower() in full_doc:
-                # # --- 1. Average Position
-                # heapq.heappush(
-                #     word_avg_pos,
-                #     (np.mean([i for i, term in enumerate(full_doc) if term == word.lower()]), word)
-                # )
-
-                # --- 2. First Position
-                heapq.heappush(
-                    word_avg_pos,
-                    (full_doc.index(word.lower()), word)
-                )
-            else:
-                heapq.heappush(
-                    word_avg_pos,
-                    (np.inf, word)
-                )
-        word_avg_pos = [heapq.heappop(word_avg_pos)[1] for i in range(len(word_avg_pos))]
-        word_rank_list.append(word_avg_pos)
-
+    #     word_avg_pos = []
+    #     for word in new_word_set:
+    #         if word.lower() in full_doc:
+    #             # --- 1. Average Position
+    #             heapq.heappush(
+    #                 word_avg_pos,
+    #                 (np.mean([i for i, term in enumerate(full_doc) if term == word.lower()]), word)
+    #             )
+    #
+    #             # --- 2. First Position
+    #             heapq.heappush(
+    #                 word_avg_pos,
+    #                 (full_doc.index(word.lower()), word)
+    #             )
+    #         else:
+    #             heapq.heappush(
+    #                 word_avg_pos,
+    #                 (np.inf, word)
+    #             )
+    #     word_avg_pos = [heapq.heappop(word_avg_pos)[1] for i in range(len(word_avg_pos))]
+    #     word_rank_list.append(word_avg_pos)
+    #
     # # --- 1. Order keywords based on average rank of each keyword
     # word_rank = {word: 0 for word in new_word_set}  # dict for storing rank of words in each relevant doc
     # for item in word_rank_list:
     #     for rank, word in enumerate(item):
     #         word_rank[word] += rank
     # new_query = ' '.join([word_tuple[0] for word_tuple in sorted(word_rank.items(), key=lambda wt: wt[1])])
-
+    #
     # # --- 2. Order keywords based on most frequent rank in relevant documents
     # word_rank_list = [' '.join(item) for item in word_rank_list]
     # new_query = max(set(word_rank_list), key=word_rank_list.count)
 
+    # *** Method 3 (Bi-gram model) is used in submission ***
     # --- 3. Order keywords based on probability from bigrams in corpus
     word_order_bigrams = (get_bigram_list(corpus, allow_stopwords=True))
     word_orders = list(itertools.permutations(new_word_set))

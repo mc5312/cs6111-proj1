@@ -215,7 +215,7 @@ def expand_query(original_query, res, fbs):
     new_words = []
     while len(new_words) < 2:
         this_score, this_word = heapq.heappop(word_queue)
-        if this_word not in original_words:
+        if this_word not in [w.lower() for w in original_words]:
             new_words.append(this_word)
     print('Augmenting by  ' + ' '.join(new_words))
     new_word_set = original_words + new_words

@@ -23,8 +23,6 @@ python3 main.py AIzaSyC8EbccVhwPEcQ-oFeFgRTZ1DgfVAOg6-8 9604022c4b8b04d7e 0.9 'L
 External Libraries|
 -------------------
 
-Every imported library, except for the Google Search API library, are standard python libraries. 
-
 The two non-standard libraries used are:
 
 (1) The Google search API library (install with 'pip3 google-api-python-client')

@@ -3,6 +3,7 @@ NAME: Bevis Cheung (mc5312), Sebastian Hereu (smh2278)
 ------
 Files| 
 ------
+
 (1) main.py - contains all of the logic of our information retrieval system 
 (2) proj1-stop.txt - contains a list of stop words, used in main.py
 
@@ -23,6 +24,11 @@ External Libraries|
 -------------------
 
 Every imported library, except for the Google Search API library, are standard python libraries. 
+
+The two non-standard libraries used are:
+
+(1) The Google search API library (install with 'pip3 google-api-python-client')
+(2) The numpy library (install with 'pip3 install numpy')
 
 -------------------
 General Description|

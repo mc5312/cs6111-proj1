@@ -21,7 +21,8 @@ python3 main.py AIzaSyC8EbccVhwPEcQ-oFeFgRTZ1DgfVAOg6-8 9604022c4b8b04d7e 0.9 'L
 -------------------
 External Libraries|
 -------------------
-(1) TODO
+
+Every imported library, except for the Google Search API library, are standard python libraries. 
 
 -------------------
 General Description|
